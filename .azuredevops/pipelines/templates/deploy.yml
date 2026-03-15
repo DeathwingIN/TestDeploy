@@ -60,4 +60,4 @@ jobs:
             appName               : $(functionAppName)
             package               : '$(System.DefaultWorkingDirectory)/publish_output/$(packageName)' #'publish_output/$(packageName)'
             deploymentMethod      : runFromPackage
-          condition               : and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+          # condition               : and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))

@@ -50,8 +50,18 @@ jobs:
       command: 'publish'
       publishWebProjects: false
       projects: 'src/AzureFunction/src/MicroCloud.Licensing.Function/MicroCloud.Licensing.Function.csproj' 
-      arguments: '--output $(Build.ArtifactStagingDirectory) --configuration Release -r win-x64 --self-contained true'
-      zipAfterPublish: true
+      arguments: '--output $(Build.ArtifactStagingDirectory)/publish_output --configuration Release -r win-x64 --self-contained true'
+      zipAfterPublish: false  # Turn this off to prevent double-zipping
+
+  # Add this new task to zip the files properly
+  - task: ArchiveFiles@2
+    displayName: 'Zip published files'
+    inputs:
+      rootFolderOrFile: '$(Build.ArtifactStagingDirectory)/publish_output'
+      includeRootFolder: false  # This is the important part!
+      archiveType: 'zip'
+      archiveFile: '$(Build.ArtifactStagingDirectory)/MicroCloud.Licensing.Function.zip'
+      replaceExistingArchive: true
 
   # Publish the ZIP file
   - task: PublishPipelineArtifact@1

@@ -34,7 +34,7 @@ resource functionApp 'Microsoft.Web/sites@2022-03-01' = {
     siteConfig: {
       vnetRouteAllEnabled: false
       alwaysOn: false // Always On is not required for Consumption plan and it will incur additional cost if enabled
-      netFrameworkVersion: 'v8.0'
+      netFrameworkVersion: 'v10.0'
       use32BitWorkerProcess: false
       minTlsVersion: '1.2'
       http20Enabled: true

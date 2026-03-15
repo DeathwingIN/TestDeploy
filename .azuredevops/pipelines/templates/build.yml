@@ -57,7 +57,7 @@ jobs:
   - task: ArchiveFiles@2
     displayName: 'Zip published files'
     inputs:
-      rootFolderOrFile: '$(Build.ArtifactStagingDirectory)/publish_output'
+      rootFolderOrFile: '$(Build.ArtifactStagingDirectory)/publish_output/MicroCloud.Licensing.Function'
       includeRootFolder: false  # This is the important part!
       archiveType: 'zip'
       archiveFile: '$(Build.ArtifactStagingDirectory)/MicroCloud.Licensing.Function.zip'

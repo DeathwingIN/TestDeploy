@@ -1,0 +1,8 @@
+variables           :
+  # an azure service connection should be appended with the environment name such as $(azureSubscription)-dev
+  azureSubscription   : 'ado-cld-mc-licensing'
+  resourceGroupPrefix : 'arg-mc-licensing-'
+  packageName         : 'MicroCloud.Licensing.Function.zip'
+  regionCode          : 'aue'
+  location            : 'Australia East'
+  System.Debug        : true

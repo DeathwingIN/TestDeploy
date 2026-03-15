@@ -1,0 +1,354 @@
+name: $(Date:yyyyMMdd)$(Rev:.r)
+
+# Trigger on changes matching the BC folder
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - 'src/BusinessCentral/*'
+
+# No PR triggers
+pr: none
+
+pool:
+  vmImage: 'windows-latest'
+
+# Runtime Parameters
+# Only keep the boolean flags for control. 
+# Environment names are now pulled from the Variable Group 'BC-Secrets'.
+parameters:
+- name: deployToSandbox
+  displayName: 'Deploy to Sandbox?'
+  type: boolean
+  default: true
+- name: deployToProduction
+  displayName: 'Deploy to Production?'
+  type: boolean
+  default: false
+
+variables:
+- group: BC-Secrets
+
+stages:
+- stage: Build
+  displayName: 'Build & Compile'
+  jobs:
+  - job: BuildJob
+    displayName: 'Compile AL Extension'
+    steps:
+    
+    # Checkout code
+    - checkout: self
+      displayName: 'Checkout Repository'
+    
+    # Install BcContainerHelper
+    - powershell: |
+        Write-Host "Installing BcContainerHelper..."
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        Install-Module -Name BcContainerHelper -Force -AllowClobber
+        Import-Module BcContainerHelper
+        Write-Host "✅ BcContainerHelper installed!"
+      displayName: 'Install BcContainerHelper'
+    
+    # Create output directories
+    - powershell: |
+        New-Item -ItemType Directory -Force -Path "$(System.DefaultWorkingDirectory)\src\BusinessCentral\output"
+        New-Item -ItemType Directory -Force -Path "$(System.DefaultWorkingDirectory)\src\BusinessCentral\.alpackages"
+        Write-Host "✅ Directories created!"
+      displayName: 'Create Output Directories'
+    
+    # Download symbols from Sandbox
+    - powershell: |
+        Write-Host "Downloading symbols from $(SandboxEnvName) (Sandbox)..."
+        
+        $authContext = New-BcAuthContext `
+            -clientID "$(BcAuthClientId)" `
+            -clientSecret "$(BcAuthClientSecret)" `
+            -tenantID "$(BcTenantId)"
+        
+        $folder = "$(System.DefaultWorkingDirectory)\src\BusinessCentral\.alpackages"
+        
+        # 1. Parse app.json for dependencies
+        $appJsonPath = "$(System.DefaultWorkingDirectory)\src\BusinessCentral\app.json"
+        $customDependencies = @()
+        
+        if (Test-Path $appJsonPath) {
+            Write-Host "Reading dependencies from app.json..."
+            try {
+                $appJson = Get-Content $appJsonPath -Raw | ConvertFrom-Json
+                if ($appJson.dependencies) {
+                    $customDependencies = $appJson.dependencies | Select-Object -ExpandProperty name
+                    Write-Host "Found dependencies in app.json: $($customDependencies -join ', ')"
+                } else {
+                    Write-Host "No dependencies found in app.json."
+                }
+            } catch {
+                Write-Warning "Failed to parse app.json. Proceeding with standard Microsoft apps only."
+                Write-Host $_
+            }
+        } else {
+            Write-Warning "app.json not found at $appJsonPath"
+        }
+
+        # 2. Define Microsoft Base Apps
+        $microsoftBaseApps = @("System", "Base Application", "System Application", "Application", "Business Foundation")
+        
+        Write-Host "Fetching list of installed extensions..."
+        $apps = Get-BcEnvironmentInstalledExtensions `
+            -bcAuthContext $authContext `
+            -environment "$(SandboxEnvName)"
+            
+        # 3. Filter Apps: Microsoft Base Apps OR Custom Dependencies
+        $targetApps = $apps | Where-Object { 
+            ($_.publisher -eq "Microsoft" -and ($_.displayName -in $microsoftBaseApps)) -or
+            ($_.displayName -in $customDependencies)
+        }
+        
+        foreach ($app in $targetApps) {
+            $version = "$($app.versionMajor).$($app.versionMinor).$($app.versionBuild).$($app.versionRevision)"
+            Write-Host "Downloading: $($app.displayName) v$version"
+            
+            Download-BcEnvironmentInstalledExtensionToFolder `
+                -bcAuthContext $authContext `
+                -environment "$(SandboxEnvName)" `
+                -appPublisher $app.publisher `
+                -appName $app.displayName `
+                -appVersion $version `
+                -folder $folder
+        }
+        
+        Write-Host "✅ Symbols downloaded!"
+        Get-ChildItem "$(System.DefaultWorkingDirectory)\src\BusinessCentral\.alpackages"
+      displayName: 'Download Symbols'
+    
+    # Install AL Compiler (VSIX)
+    - powershell: |
+        Write-Host "Downloading AL Language Extension (VSIX)..."
+        $vsixUrl = "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/ms-dynamics-smb/vsextensions/al/latest/vspackage"
+        $zipPath = "$(System.DefaultWorkingDirectory)\al-extension.zip"
+        $extractPath = "$(System.DefaultWorkingDirectory)\al-compiler-raw"
+        
+        # Download VSIX as ZIP
+        Invoke-WebRequest -Uri $vsixUrl -OutFile $zipPath
+        
+        # Extract
+        Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+        
+        # Find alc.exe
+        $alcPath = Get-ChildItem -Path $extractPath -Filter "alc.exe" -Recurse | Select-Object -First 1
+        
+        if (-not $alcPath) {
+            throw "❌ alc.exe not found in downloaded VSIX!"
+        }
+        
+        Write-Host "Found alc.exe at: $($alcPath.FullName)"
+        
+        # Prepare tools directory
+        $toolsPath = "$(System.DefaultWorkingDirectory)\src\BusinessCentral\tools"
+        New-Item -ItemType Directory -Force -Path $toolsPath | Out-Null
+        
+        # Copy all compiler files to tools directory
+        Copy-Item -Path "$($alcPath.Directory)\*" -Destination $toolsPath -Recurse -Force
+        
+        # Cleanup temporary files to prevent compilation errors
+        Write-Host "Cleaning up temporary files..."
+        Remove-Item -Path $zipPath -Force
+        Remove-Item -Path $extractPath -Recurse -Force
+        
+        Write-Host "✅ AL Compiler installed to $toolsPath"
+        Get-ChildItem $toolsPath | Select-Object -First 5
+      displayName: 'Install AL Compiler'
+    
+    # Compile AL Code
+    - powershell: |
+        Write-Host "Finding AL Compiler..."
+        $alcPath = Get-ChildItem -Path "$(System.DefaultWorkingDirectory)\src\BusinessCentral\tools" -Filter "alc.exe" -Recurse | Select-Object -First 1
+        
+        if (-not $alcPath) {
+            throw "❌ AL Compiler not found!"
+        }
+        
+        # Parse app.json for output filename
+        $appJsonPath = "$(System.DefaultWorkingDirectory)\src\BusinessCentral\app.json"
+        
+        if (Test-Path $appJsonPath) {
+            $json = Get-Content $appJsonPath -Raw | ConvertFrom-Json
+            
+            # Simple sanitization to remove invalid filename chars
+            $publisher = $json.publisher -replace '[\\/:*?"<>|]',''
+            $name = $json.name -replace '[\\/:*?"<>|]',''
+            $version = $json.version
+            
+            $appName = "${publisher}_${name}_${version}.app"
+        } else {
+            Write-Warning "app.json not found! Fallback to default name."
+            $appName = "DevOpsTest.app"
+        }
+        
+        Write-Host "Compiling with: $($alcPath.FullName)"
+        Write-Host "Output File: $appName"
+        
+        & $alcPath.FullName `
+            /project:"$(System.DefaultWorkingDirectory)\src\BusinessCentral" `
+            /packagecachepath:"$(System.DefaultWorkingDirectory)\src\BusinessCentral\.alpackages" `
+            /out:"$(System.DefaultWorkingDirectory)\src\BusinessCentral\output\$appName"
+        
+        if ($LASTEXITCODE -ne 0) {
+            throw "❌ Compilation failed with exit code $LASTEXITCODE"
+        }
+        
+        Write-Host "✅ Compilation successful!"
+        Get-ChildItem "$(System.DefaultWorkingDirectory)\src\BusinessCentral\output"
+      displayName: 'Compile AL Code'
+    
+    # Stage custom dependencies
+    - powershell: |
+        Write-Host "Staging custom dependencies..."
+        
+        $appJsonPath = "$(System.DefaultWorkingDirectory)\src\BusinessCentral\app.json"
+        
+        if (Test-Path $appJsonPath) {
+            $appJson = Get-Content $appJsonPath -Raw | ConvertFrom-Json
+            if ($appJson.dependencies) {
+                $customDependencies = $appJson.dependencies | Select-Object -ExpandProperty name
+                Write-Host "Found dependencies: $($customDependencies -join ', ')"
+                
+                foreach ($depName in $customDependencies) {
+                    # Find the app file in .alpackages matching the dependency name
+                    $depFile = Get-ChildItem -Path "$(System.DefaultWorkingDirectory)\src\BusinessCentral\.alpackages" -Filter "*$depName*.app" | Sort-Object Name -Descending | Select-Object -First 1
+                    
+                    if ($depFile) {
+                        Write-Host "Copying dependency: $($depFile.Name)"
+                        Copy-Item -Path $depFile.FullName -Destination "$(System.DefaultWorkingDirectory)\src\BusinessCentral\output" -Force
+                    } else {
+                        Write-Warning "Could not find .app file for dependency: $depName"
+                    }
+                }
+            } else {
+                Write-Host "No dependencies to stage."
+            }
+        }
+    
+        Write-Host "✅ Staging complete!"
+        Get-ChildItem "$(System.DefaultWorkingDirectory)\src\BusinessCentral\output"
+      displayName: 'Stage Dependencies'
+
+    # Publish build artifact
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish App Artifact'
+      inputs:
+        PathtoPublish: '$(System.DefaultWorkingDirectory)\src\BusinessCentral\output'
+        ArtifactName: 'app'
+        publishLocation: 'Container'
+
+
+# Sandbox Deployment Stage
+- stage: DeploySandbox
+  displayName: 'Deploy to Sandbox'
+  dependsOn: Build
+  condition: and(succeeded(), eq('${{ parameters.deployToSandbox }}', 'true'))
+  jobs:
+  - deployment: DeployToSandbox
+    displayName: 'Deploy to $(SandboxEnvName)'
+    environment: '$(SandboxDevOpsEnv)'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: app
+          
+          - task: PowerShell@2
+            displayName: 'Deploy to $(SandboxEnvName)'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "Deploying to Sandbox: $(SandboxEnvName)..."
+                
+                # Install BcContainerHelper
+                $packageProvider = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue
+                if (-not $packageProvider) {
+                    Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
+                }
+                Install-Module -Name BcContainerHelper -Force -AllowClobber -Scope CurrentUser
+                Import-Module BcContainerHelper
+                
+                $authContext = New-BcAuthContext `
+                    -clientId "$(BcAuthClientId)" `
+                    -clientSecret "$(BcAuthClientSecret)" `
+                    -tenantId "$(BcTenantId)"
+                
+                $appFiles = Get-ChildItem "$(Pipeline.Workspace)\app\*.app"
+                
+                if ($appFiles.Count -eq 0) {
+                    throw "❌ No .app files found in artifact!"
+                }
+                
+                Write-Host "Found apps to deploy:"
+                $appFiles | ForEach-Object { Write-Host " - $($_.Name)" }
+                
+                # Sort apps by dependencies ensures dependencies are published first if needed. 
+                # BcContainerHelper's Publish-PerTenantExtensionApps handles list of files.
+                # However, to be safe, we rely on the tool to handle the order or pass them all.
+                
+                Publish-PerTenantExtensionApps `
+                    -bcAuthContext $authContext `
+                    -environment "$(SandboxEnvName)" `
+                    -appFile ($appFiles | Select-Object -ExpandProperty FullName)
+                
+                Write-Host "✅ Successfully deployed to $(SandboxEnvName)!"
+
+# Production Deployment Stage
+- stage: DeployProduction
+  displayName: 'Deploy to Production'
+  dependsOn: Build
+  condition: and(succeeded(), eq('${{ parameters.deployToProduction }}', 'true'))
+  jobs:
+  - deployment: DeployToProduction
+    displayName: 'Deploy to $(ProductionEnvName)'
+    environment: '$(ProductionDevOpsEnv)'  # Requires manual approval!
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: app
+          
+          - task: PowerShell@2
+            displayName: 'Deploy to $(ProductionEnvName)'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "Deploying to Production: $(ProductionEnvName)..."
+                
+                # Install BcContainerHelper
+                $packageProvider = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue
+                if (-not $packageProvider) {
+                    Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
+                }
+                Install-Module -Name BcContainerHelper -Force -AllowClobber -Scope CurrentUser
+                Import-Module BcContainerHelper
+                
+                $authContext = New-BcAuthContext `
+                    -clientId "$(BcAuthClientId)" `
+                    -clientSecret "$(BcAuthClientSecret)" `
+                    -tenantId "$(BcProdTenantId)"
+                
+                $appFiles = Get-ChildItem "$(Pipeline.Workspace)\app\*.app"
+                
+                if ($appFiles.Count -eq 0) {
+                    throw "❌ No .app files found in artifact!"
+                }
+                
+                Write-Host "Found apps to deploy:"
+                $appFiles | ForEach-Object { Write-Host " - $($_.Name)" }
+                
+                Publish-PerTenantExtensionApps `
+                    -bcAuthContext $authContext `
+                    -environment "$(ProductionEnvName)" `
+                    -companyName "CRONUS USA, Inc." `
+                    -appFile ($appFiles | Select-Object -ExpandProperty FullName)
+                
+                Write-Host "✅ Successfully deployed to $(ProductionEnvName) (Production)!"

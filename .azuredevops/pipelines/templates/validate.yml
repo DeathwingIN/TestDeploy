@@ -1,0 +1,23 @@
+parameters:
+  - name: environments
+    type: object
+    default: []
+  - name: regionCode
+    type: string
+
+jobs:
+- job: BuildInfrastructure
+  displayName: Build CLD-LDZ HUM infrastructure
+  steps:
+  - ${{ each env in parameters.environments }}:
+  # Bicep Validate
+    - task                  : AzureResourceManagerTemplateDeployment@3
+      displayName           : 'Validate Permissions in environment : ${{ env }}'
+      inputs                :
+        connectedServiceName  : $(azureSubscription)-${{ env }}
+        location              : $(location)
+        deploymentMode        : Validation
+        resourceGroupName     : $(resourceGroupPrefix)${{ env }}-${{ parameters.regionCode }}
+        csmFile               : src/AzureFunction/deploy/main.bicep
+        csmParametersFile     : src/AzureFunction/deploy/parameters/main.parameters.${{ env }}.json
+        overrideParameters    : '-environment ${{ env }}'

@@ -1,0 +1,70 @@
+# jobs:
+# - job                       : BuildFunctionApps
+#   displayName               : Build MicroCloud Licensing function app
+#   steps:
+#   - task                      : UseDotNet@2
+#     displayName               : "Install .NET Core SDK"
+#     inputs                    :
+#       version                 : 10.x
+#       performMultiLevelLookup : true
+#       includePreviewVersions  : false
+
+#   - task: DotNetCoreCLI@2
+#     displayName: build apps for publishing
+#     inputs:
+#       command: 'publish'
+#       publishWebProjects: false
+#       projects: src/AzureFunction/src/*/*.Function.csproj
+#       arguments: '--output publish_output --configuration Release'
+
+#   # Publish the function app artifact
+#   - task: PublishPipelineArtifact@1
+#     displayName: Publish Function App
+#     inputs:
+#       targetPath          : '$(System.DefaultWorkingDirectory)/publish_output'
+#       artifact            : 'functionApps'
+#       publishLocation     : 'pipeline'
+
+#   # Publish the Infrastructure artifacts.
+#   - task                    : PublishPipelineArtifact@1
+#     displayName             : Publish Infrastructure
+#     inputs                  :
+#       targetPath            : '$(System.DefaultWorkingDirectory)/src/AzureFunction/deploy'
+#       artifact              : 'deploy'
+#       publishLocation       : 'pipeline'
+
+
+jobs:
+- job: BuildFunctionApps
+  displayName: Build MicroCloud Licensing function app
+  steps:
+  - task: UseDotNet@2
+    displayName: "Install .NET Core SDK"
+    inputs:
+      version: 10.x
+      performMultiLevelLookup: true
+
+  - task: DotNetCoreCLI@2
+    displayName: Publish App
+    inputs:
+      command: 'publish'
+      publishWebProjects: false
+      projects: 'src/AzureFunction/src/MicroCloud.Licensing.Function/MicroCloud.Licensing.Function.csproj' 
+      arguments: '--output $(Build.ArtifactStagingDirectory) --configuration Release -r win-x64 --self-contained true'
+      zipAfterPublish: true
+
+  # Publish the ZIP file
+  - task: PublishPipelineArtifact@1
+    displayName: Publish Function App Zip
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/MicroCloud.Licensing.Function.zip'
+      artifact: 'functionApps'
+      publishLocation: 'pipeline'
+
+  # Publish the Bicep files
+  - task: PublishPipelineArtifact@1
+    displayName: Publish Infrastructure
+    inputs:
+      targetPath: '$(System.DefaultWorkingDirectory)/src/AzureFunction/deploy'
+      artifact: 'deploy'
+      publishLocation: 'pipeline'

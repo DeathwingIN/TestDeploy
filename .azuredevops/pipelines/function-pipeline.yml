@@ -1,0 +1,67 @@
+trigger:
+  branches:
+    include:
+      - main
+      - feat/Azure-template
+  paths:
+    include:
+      - 'src/AzureFunction/*'
+
+pool                    :
+  vmImage               : ubuntu-latest
+
+variables               :
+  - template            : variables/mc-licensing-generic.yml
+
+stages                  :
+
+- stage                 : Test
+  displayName           : Test
+  jobs                  :
+  - template            : templates/test.yml
+
+- stage                 : Validate
+  displayName           : Validate All Environments
+  jobs:
+  - template            : templates/validate.yml
+    parameters          :
+      environments   : 
+        - dev
+      regionCode        : ${{ variables.regionCode }}
+
+- stage                 : Build
+  dependsOn             : Validate
+  displayName           : Build
+  jobs                  :
+  - template            : templates/build.yml
+
+- stage                 : DeployDev
+  dependsOn             : Build
+  displayName           : Deploy Dev
+  jobs:
+  - template            : templates/deploy.yml
+    parameters          :
+      environmentName   : dev
+      regionCode        : ${{ variables.regionCode }}
+  
+  
+- stage                 : DeployUat
+  dependsOn             : Build
+  condition: eq(variables['Build.Reason'], 'Manual')
+  displayName           : Deploy Uat
+  jobs:
+  - template            : templates/deploy.yml
+    parameters          :
+      environmentName   : uat
+      regionCode        : ${{ variables.regionCode }}
+      
+  
+- stage                 : DeployPrd
+  dependsOn             : Build
+  condition: eq(variables['Build.Reason'], 'Manual')
+  displayName           : Deploy Prd
+  jobs:
+  - template            : templates/deploy.yml
+    parameters          :
+      environmentName   : prd
+      regionCode        : ${{ variables.regionCode }}

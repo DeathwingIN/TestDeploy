@@ -1,0 +1,5 @@
+.alpackages/*
+.vscode/.alcache/*
+src/BusinessCentral/.vscode/.alcache/*
+tmp_publish/*
+tmp_verify/*

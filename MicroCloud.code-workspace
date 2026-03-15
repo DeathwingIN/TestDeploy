@@ -1,0 +1,17 @@
+{
+    "folders": [
+        {
+            "path": "src/BusinessCentral",
+            "name": "Business Central"
+        },
+        {
+            "path": "src/AzureFunction",
+            "name": "Azure Function"
+        },
+        {
+            "path": ".",
+            "name": "Monorepo Root"
+        }
+    ],
+    "settings": {}
+}

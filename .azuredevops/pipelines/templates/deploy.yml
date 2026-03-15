@@ -1,0 +1,63 @@
+parameters:
+  - name: environmentName
+    type: string
+  - name: regionCode
+    type: string
+
+jobs:
+- deployment: DeployInfrastructure
+  displayName: Deploy MicroCloud Licensing infrastructure
+  environment: ${{ parameters.environmentName }}
+  
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        # Download Bicep templates
+        - task                    : DownloadPipelineArtifact@2
+          displayName             : Download Deployment Modules
+          inputs                  :
+            artifact              : 'deploy'
+            path                  : $(System.DefaultWorkingDirectory)
+
+        - task                    : AzureResourceManagerTemplateDeployment@3
+          displayName             : Deploy Infrastructure As Code
+          inputs                  :
+            connectedServiceName  : $(azureSubscription)-${{ parameters.environmentName }}
+            location              : $(location)
+            deploymentMode        : Incremental
+            resourceGroupName     : $(resourceGroupPrefix)${{ parameters.environmentName }}-${{ parameters.regionCode }}
+            csmFile               : main.bicep
+            csmParametersFile     : parameters/main.parameters.${{ parameters.environmentName }}.json
+            overrideParameters    : '-environment ${{ parameters.environmentName }}'
+            deploymentOutputs     : deploymentOutputs
+
+        - task                    : AzurePowerShell@5
+          displayName             : Parse Deployment Outputs
+          inputs:
+            azureSubscription     : $(azureSubscription)-${{ parameters.environmentName }}
+            scriptType            : 'InlineScript'
+            Inline                : |
+              $var = ConvertFrom-Json '$(deploymentOutputs)'
+              $value = $var.functionAppName.value
+              Write-Host "##vso[task.setvariable variable=functionAppName;]$value"
+            azurePowerShellVersion: 'latestVersion'
+            pwsh                  : true
+
+        # Download app
+        - task                    : DownloadPipelineArtifact@2
+          displayName             : Download Function App Package
+          inputs                  :
+            artifact              : functionApps
+            path                  : '$(System.DefaultWorkingDirectory)/publish_output'
+
+        # Publish function app artifacts.
+        - task                    : AzureFunctionApp@1
+          displayName             : Deploy Function App
+          inputs                  :
+            azureSubscription     : $(azureSubscription)-${{ parameters.environmentName }}
+            appType               : 'functionApp' #functionAppLinux
+            appName               : $(functionAppName)
+            package               : '$(System.DefaultWorkingDirectory)/publish_output/$(packageName)' #'publish_output/$(packageName)'
+            deploymentMethod      : runFromPackage
+          condition               : and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))

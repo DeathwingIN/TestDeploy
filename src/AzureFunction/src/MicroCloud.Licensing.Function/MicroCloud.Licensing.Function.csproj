@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <AzureFunctionsVersion>v4</AzureFunctionsVersion>
+        <OutputType>Exe</OutputType>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>MicroCloud.Licensing.Function</RootNamespace>
+        <AssemblyName>MicroCloud.Licensing.Function</AssemblyName>
+    </PropertyGroup>
+
+    <!-- Azure Functions (Isolated worker) -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="2.51.0" />
+        <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.0.7" OutputItemType="Analyzer" />
+
+        <!-- HttpTrigger support -->
+        <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.3.0" />
+
+        <!-- Timer trigger support (for future use) -->
+        <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" Version="4.3.1" />
+    </ItemGroup>
+
+    <!-- Azure SDKs -->
+    <ItemGroup>
+        <PackageReference Include="Azure.Identity" Version="1.17.1" />
+        <PackageReference Include="Microsoft.Extensions.Azure" Version="1.13.1" />
+    </ItemGroup>
+
+    <!-- Identity / JWT validation -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.16.0" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.16.0" />
+    </ItemGroup>
+
+    <!-- JSON -->
+    <ItemGroup>
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    </ItemGroup>
+
+    <!-- Application Insights -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.23.0" />
+        <PackageReference Include="Microsoft.Azure.Functions.Worker.ApplicationInsights" Version="2.50.0" />
+    </ItemGroup>
+
+    <!-- Config files -->
+    <ItemGroup>
+        <None Update="host.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+
+        <None Update="local.settings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+        </None>
+    </ItemGroup>
+
+</Project>

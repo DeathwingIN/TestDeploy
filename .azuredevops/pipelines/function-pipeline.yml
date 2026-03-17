@@ -2,7 +2,6 @@ trigger:
   branches:
     include:
       - main
-      - feat/Azure-template
   paths:
     include:
       - 'src/AzureFunction/*'

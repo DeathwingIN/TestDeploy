@@ -7,6 +7,26 @@
 param environment string = 'dev'
 
 param location string = resourceGroup().location
+@description('Skip Token Validation')
+param skipTokenValidation string = 'false'
+
+@description('Business Central Webhook Endpoint')
+param bcWebhookEndpoint string = ''
+
+@description('Business Central Environment Name')
+param bcEnvironmentName string = 'Production'
+
+@description('Business Central Company ID')
+param bcCompanyId string = ''
+
+@description('Business Central Company Name')
+param bcCompanyName string = ''
+
+@description('Azure Client ID for accessing Key Vault')
+param azureClientId string = ''
+
+@secure()
+param azureClientSecret string = ''
 
 @description('Release Id for deployment name')
 param releaseId string = 'manual-local-${utcNow('ddMMyyyyHHmm')}-1'
@@ -18,35 +38,35 @@ param aadTenantId string = ''
 param isvClientId string = ''
 
 // Variables
-var licensingCode             = 'licensing'
-var licensingSuffix           = 'mc-licensing-${toLower(environment)}'
-var storageAccountName        = 'stgmclicensing${environment}'
-var appUniqueSuffix           = substring(uniqueString(storageAccountName), 0, 4)
-var releaseIdParts            = split(releaseId, '-')
-var deploymentId              = '${releaseIdParts[2]}-${releaseIdParts[3]}'
-var attachmentsContainerName  = 'attachments'
+var licensingCode = 'licensing'
+var licensingSuffix = 'mc-licensing-${toLower(environment)}'
+var storageAccountName = 'stgmclicensing${environment}'
+var appUniqueSuffix = substring(uniqueString(storageAccountName), 0, 4)
+var releaseIdParts = split(releaseId, '-')
+var deploymentId = '${releaseIdParts[2]}-${releaseIdParts[3]}'
+var attachmentsContainerName = 'attachments'
 
-var conventions   = {
-  location        : location
-  environment     : environment
-  deploymentId    : deploymentId
-  baseTags        : {
-    releaseId     : toLower(releaseId)
-    environment   : environment
-    component     : licensingCode
-    use           : 'integration'
+var conventions = {
+  location: location
+  environment: environment
+  deploymentId: deploymentId
+  baseTags: {
+    releaseId: toLower(releaseId)
+    environment: environment
+    component: licensingCode
+    use: 'integration'
   }
 }
 
-var resourceNames     = {
-  resourceGroup       : resourceGroup().name
-  functionApp         : take('fap-${licensingSuffix}', 127)
-  storageAccount      : {
-    name              : take('${storageAccountName}${appUniqueSuffix}', 24)
+var resourceNames = {
+  resourceGroup: resourceGroup().name
+  functionApp: take('fap-${licensingSuffix}', 127)
+  storageAccount: {
+    name: take('${storageAccountName}${appUniqueSuffix}', 24)
   }
-  appServicePlan      : 'asp-${licensingSuffix}'
-  appInsights         : 'ai-${licensingSuffix}'
-  logAnalytics        : 'law-${licensingSuffix}'
+  appServicePlan: 'asp-${licensingSuffix}'
+  appInsights: 'ai-${licensingSuffix}'
+  logAnalytics: 'law-${licensingSuffix}'
 }
 
 // resources
@@ -78,8 +98,8 @@ module storageAccoutDeployment 'modules/storageAccount.bicep' = {
   params: {
     conventions: conventions
     resourceNames: resourceNames
-    attachmentsContainerName : attachmentsContainerName
-    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id 
+    attachmentsContainerName: attachmentsContainerName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
   }
 }
 
@@ -95,16 +115,24 @@ module appServicePlanDeployment 'modules/appServicePlan.bicep' = {
 module functionAppDeployment 'modules/functionApp.bicep' = {
   name: take('fa-${deploymentId}', 64)
   params: {
-    conventions             : conventions
-    resourceNames           : resourceNames
-    appServicePlanId        : appServicePlanDeployment.outputs.id
-    storageAccountName      : storageAccoutDeployment.outputs.name
+    conventions: conventions
+    resourceNames: resourceNames
+    appServicePlanId: appServicePlanDeployment.outputs.id
+    storageAccountName: storageAccoutDeployment.outputs.name
     attachmentsContainerName: attachmentsContainerName
-    aadTenantId             : aadTenantId
-    isvClientId             : isvClientId
-    logAnalyticsWorkspaceId : logAnalyticsWorkspace.id
+    aadTenantId: aadTenantId
+    isvClientId: isvClientId
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
     appInsightsInstrumentationKey: appInsights.properties.InstrumentationKey
     appInsightsConnectionString: appInsights.properties.ConnectionString
+
+    skipTokenValidation: skipTokenValidation
+    bcWebhookEndpoint: bcWebhookEndpoint
+    bcEnvironmentName: bcEnvironmentName
+    bcCompanyId: bcCompanyId
+    bcCompanyName: bcCompanyName
+    azureClientId: azureClientId
+    azureClientSecret: azureClientSecret
   }
 }
 

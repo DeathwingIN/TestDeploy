@@ -1,6 +1,17 @@
 param conventions object
 param resourceNames object
 
+param skipTokenValidation string
+param bcWebhookEndpoint string
+param bcEnvironmentName string
+param bcCompanyId string
+param bcCompanyName string
+
+param azureClientId string
+
+@secure()
+param azureClientSecret string
+
 @description('App Service Plan (Id).')
 param appServicePlanId string
 
@@ -49,19 +60,27 @@ resource functionAppAppsettings 'Microsoft.Web/sites/config@2022-03-01' = {
   name: 'appsettings'
   parent: functionApp
   properties: {
-    APPINSIGHTS_INSTRUMENTATIONKEY                : appInsightsInstrumentationKey
-    APPLICATIONINSIGHTS_CONNECTION_STRING         : appInsightsConnectionString
-    FUNCTIONS_EXTENSION_VERSION                   : '~4'
-    FUNCTIONS_WORKER_RUNTIME                      : 'dotnet-isolated'
-    AzureWebJobsStorage                           : storageAccountConnectionString
-    WEBSITE_CONTENTAZUREFILECONNECTIONSTRING      : storageAccountConnectionString
-    WEBSITE_CONTENTSHARE                          : toLower('functionapp${substring(uniqueString(functionApp.name, resourceNames.resourceGroup),0,6)}')
-    WEBSITE_LOAD_USER_PROFILE                     : '1'
-    AadTenantId                                   : aadTenantId
-    IsvClientId                                   : isvClientId
-    EnvironmentName                               : conventions.environment
-    AttachmentsStorageBaseURL                     : 'https://${storageAccountName}.blob.${environment().suffixes.storage}'
-    AttachmentsContainerName                      : attachmentsContainerName
+    APPINSIGHTS_INSTRUMENTATIONKEY: appInsightsInstrumentationKey
+    APPLICATIONINSIGHTS_CONNECTION_STRING: appInsightsConnectionString
+    FUNCTIONS_EXTENSION_VERSION: '~4'
+    FUNCTIONS_WORKER_RUNTIME: 'dotnet-isolated'
+    AzureWebJobsStorage: storageAccountConnectionString
+    WEBSITE_CONTENTAZUREFILECONNECTIONSTRING: storageAccountConnectionString
+    WEBSITE_CONTENTSHARE: toLower('functionapp${substring(uniqueString(functionApp.name, resourceNames.resourceGroup),0,6)}')
+    WEBSITE_LOAD_USER_PROFILE: '1'
+    AadTenantId: aadTenantId
+    IsvClientId: isvClientId
+    EnvironmentName: conventions.environment
+    AttachmentsStorageBaseURL: 'https://${storageAccountName}.blob.${environment().suffixes.storage}'
+    AttachmentsContainerName: attachmentsContainerName
+
+    SkipTokenValidation: skipTokenValidation
+    BcWebhookEndpoint: bcWebhookEndpoint
+    BcEnvironmentName: bcEnvironmentName
+    BcCompanyId: bcCompanyId
+    BcCompanyName: bcCompanyName
+    AzureClientId: azureClientId
+    AzureClientSecret: azureClientSecret
   }
 }
 

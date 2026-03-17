@@ -1,11 +1,13 @@
+using System;
+using System.Linq;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MicroCloud.Licensing.Function.Config;
+using MicroCloud.Licensing.Function.Services; // Added this to use your new services
 
 var host = new HostBuilder()
-
     .ConfigureFunctionsWorkerDefaults()
     .ConfigureServices(services =>
     {
@@ -16,7 +18,6 @@ var host = new HostBuilder()
         services.Configure<LoggerFilterOptions>(options =>
         {
             // Application Insights SDK adds a default filter for Warning+. Remove to capture Information+.
-            // See: https://learn.microsoft.com/en-us/azure/azure-monitor/app/worker-service#ilogger-logs
             LoggerFilterRule? appInsightsRule = options.Rules.FirstOrDefault(rule =>
                 rule.ProviderName == "Microsoft.Extensions.Logging.ApplicationInsights.ApplicationInsightsLoggerProvider");
             if (appInsightsRule is not null)
@@ -25,10 +26,16 @@ var host = new HostBuilder()
             }
         });
 
-        // Register services locally
+        // 1. Register configuration locally
         services.AddSingleton<ICustomApplicationConfig, AppConfig>();
-    })
 
+        // 2. Register HTTP Client for Business Central Service
+        // This is the best way to handle HttpClient in Azure Functions
+        services.AddHttpClient<IBusinessCentralService, BusinessCentralService>();
+
+        // 3. Register the Token Validator Service
+        services.AddSingleton<ITokenValidatorService, TokenValidatorService>();
+    })
     .Build();
 
 try

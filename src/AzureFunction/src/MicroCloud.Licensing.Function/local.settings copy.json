@@ -1,0 +1,15 @@
+{
+    "IsEncrypted": false,
+    "Values": {
+        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+        "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+        "SkipTokenValidation": "true",
+        "BcWebhookEndpoint": "https://api.businesscentral.dynamics.com/v2.0/{{TenantId}}/{{EnvironmentName}}/api/microcloud360/licensing/v1.0/companies({{CompanyId}})/marketplaceWebhooks",
+        "AadTenantId": "fa51c2d9-b92c-4ee0-8186-a8733f338c47",
+        "BcEnvironmentName": "DemoMV",
+        "BcCompanyId": "",
+        "BcCompanyName": "CRONUS International Ltd.",
+        "AzureClientId": "7e53abf2-255e-4ff6-a68d-d674c6571d3a",
+        "AzureClientSecret": "s6s8Q~763sHLKf6bGVrIt8ZpZlc6qRSFYvzmWavT"
+    }
+}

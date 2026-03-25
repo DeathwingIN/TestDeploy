@@ -7,7 +7,7 @@ codeunit 50301 "Webhook Process Mgt."
         ProcessWebhook(Rec);
     end;
 
-    local procedure ProcessWebhook(var WebhookLog: Record "Webhook Log")
+    procedure ProcessWebhook(var WebhookLog: Record "Webhook Log")
     var
         ISVSubscription: Record "ISV Subscription";
         FulfillmentMgt: Codeunit "Fulfillment API Mgt.";
@@ -18,63 +18,74 @@ codeunit 50301 "Webhook Process Mgt."
 
         Success := true;
 
+        // 2. Check if the subscription already exists in your table
         if not ISVSubscription.Get(WebhookLog."Subscription Id") then begin
+
             // If it's a new subscription, insert it
             if WebhookLog.Action = 'Subscribe' then begin
                 ISVSubscription.Init();
                 ISVSubscription."Subscription Id" := WebhookLog."Subscription Id";
                 ISVSubscription."Plan Id" := WebhookLog."Plan Id";
                 ISVSubscription.Quantity := WebhookLog.Quantity;
+
+                // Set safely using the Enum directly (avoids the ALAL0122 error)
                 ISVSubscription.Status := ISVSubscription.Status::Subscribed;
-                // Note: The rest of the fields like AAD Tenant ID might not be in the webhook payload directly.
-                ISVSubscription.Insert();
+
+                ISVSubscription.Insert(true);
             end else begin
+                // Skip processing modifications for non-existent subscriptions
                 WebhookLog.Processed := true;
-                WebhookLog.Modify();
-                exit; // Skip processing modifications for non-existent subscriptions
+                WebhookLog.Modify(true);
+                exit;
             end;
+
         end else begin
-            // Update existing subscription
+
+            // 3. Update existing subscription based on Microsoft's Action
             case WebhookLog.Action of
                 'Subscribe':
                     begin
                         ISVSubscription.Status := ISVSubscription.Status::Subscribed;
                         ISVSubscription.Quantity := WebhookLog.Quantity;
-                        ISVSubscription.Modify();
                     end;
                 'ChangeQuantity':
                     begin
                         ISVSubscription.Quantity := WebhookLog.Quantity;
-                        ISVSubscription.Modify();
                     end;
                 'Suspend':
                     begin
                         ISVSubscription.Status := ISVSubscription.Status::Suspended;
-                        ISVSubscription.Modify();
                     end;
                 'Unsubscribe':
                     begin
                         ISVSubscription.Status := ISVSubscription.Status::Unsubscribed;
-                        ISVSubscription.Modify();
                     end;
                 'Reinstate':
                     begin
                         ISVSubscription.Status := ISVSubscription.Status::Subscribed;
-                        ISVSubscription.Modify();
                     end;
+                else begin
+                    // Fallback: If Action is empty but Microsoft sent a Status text
+                    if WebhookLog.Status <> '' then
+                        Evaluate(ISVSubscription.Status, WebhookLog.Status);
+                end;
             end;
+
+            ISVSubscription.Modify(true);
         end;
 
-        // Acknowledge operation to Microsoft
-        FulfillmentMgt.AcknowledgeOperation(
-            WebhookLog."Subscription Id",
-            WebhookLog."Operation Id",
-            WebhookLog."Plan Id",
-            WebhookLog.Quantity,
-            Success
-        );
+        ///TODO:Enable for prodcution - This is the call to Microsoft API to acknowledge the operation. You should implement this in your codeunit and call it here with the appropriate parameters. This is important to let Microsoft know that you have received and processed the webhook event successfully. If you don't acknowledge, Microsoft may retry sending the same event multiple times.
+        // 4. Acknowledge operation to Microsoft so they know you received it
+        // FulfillmentMgt.AcknowledgeOperation(
+        //     WebhookLog."Subscription Id",
+        //     WebhookLog."Operation Id",
+        //     WebhookLog."Plan Id",
+        //     WebhookLog.Quantity,
+        //     Success
+        // );
 
+        // 5. Mark as fully processed so it doesn't run again
         WebhookLog.Processed := true;
-        WebhookLog.Modify();
+        WebhookLog.Modify(true);
     end;
 }

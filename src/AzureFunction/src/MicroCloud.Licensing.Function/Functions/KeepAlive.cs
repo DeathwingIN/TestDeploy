@@ -8,7 +8,7 @@
 //     public class KeepAlive
 //     {
 //         [Function("KeepAlive")]
-//         public Task Run([TimerTrigger("0 */1 * * * *")] TimerInfo myTimer, ILogger log)
+//         public Task Run([TimerTrigger("0 0 */2 * * *")] TimerInfo myTimer, ILogger log)
 //         {
 //             log.LogInformation("KeepAlive timer trigger executed at: {Time}", DateTime.UtcNow);
 //             return Task.CompletedTask;

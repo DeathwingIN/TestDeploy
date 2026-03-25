@@ -63,6 +63,7 @@ var resourceNames = {
   functionApp: take('fap-${licensingSuffix}', 127)
   storageAccount: {
     name: take('${storageAccountName}${appUniqueSuffix}', 24)
+    //checkpointTableName: 'keepalivecheckpoints'
   }
   appServicePlan: 'asp-${licensingSuffix}'
   appInsights: 'ai-${licensingSuffix}'

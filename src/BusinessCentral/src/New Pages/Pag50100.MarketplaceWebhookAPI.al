@@ -71,12 +71,11 @@ page 50300 "Marketplace Webhook API"
     var
         WebhookProcessMgt: Codeunit "Webhook Process Mgt.";
     begin
-        // Fire processing in the background or synchronously.
-        // For simplicity and immediate action, we could call it here if we want synchronous processing,
-        // or let a Job Queue process records where Processed = false.
-        // It's safer to schedule it so we can quickly return a 200 OK to Microsoft.
+        //  save the Webhook Log record into the database first
+        Rec.Insert(true);
+        // process it to update the ISV Subscriptions table
+        WebhookProcessMgt.ProcessWebhook(Rec);
+        exit(false);
 
-        // We accept the insert.
-        exit(true);
     end;
 }

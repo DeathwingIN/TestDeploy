@@ -28,27 +28,27 @@ page 50303 "MC3 ISV Subscriptions"
                     ApplicationArea = All;
                     ToolTip = 'Specifies the value of the Customer Name field.';
                 }
-                field("Plan Id"; Rec."Plan Id")
-                {
-                    ApplicationArea = All;
-                    ToolTip = 'Specifies the value of the Plan Id field.';
-                }
-                field(Quantity; Rec.Quantity)
-                {
-                    ApplicationArea = All;
-                    ToolTip = 'Specifies the value of the Quantity field.';
-                }
+                // field("Plan Id"; Rec."Plan Id")
+                // {
+                //     ApplicationArea = All;
+                //     ToolTip = 'Specifies the value of the Plan Id field.';
+                // }
+                // field(Quantity; Rec.Quantity)
+                // {
+                //     ApplicationArea = All;
+                //     ToolTip = 'Specifies the value of the Quantity field.';
+                // }
                 field(Status; Rec.Status)
                 {
                     ApplicationArea = All;
                     ToolTip = 'Specifies the value of the Status field.';
                 }
 
-                field(Trial; Rec.Trial)
-                {
-                    ApplicationArea = All;
-                    ToolTip = 'Specifies the value of the Trial field.';
-                }
+                // field(Trial; Rec.Trial)
+                // {
+                //     ApplicationArea = All;
+                //     ToolTip = 'Specifies the value of the Trial field.';
+                // }
             }
         }
     }
